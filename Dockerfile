@@ -1,15 +1,26 @@
 # Dockerfile
-# Start with a Red Hat Universal Base Image 9, which is similar to RHEL
-FROM registry.redhat.io/ubi9/ubi
+# Use CentOS Stream 9 so we can install kernel headers without a Red Hat subscription.
+FROM quay.io/centos/centos:stream9 AS build
 
-# Install the build tools: the kernel headers for the latest kernel, make, and gcc
-RUN dnf install -y kernel-devel make gcc elfutils-libelf-devel
+# Install toolchain and kernel headers that match the container's kernel.
+# NOTE: The module will match the kernel inside the container, not your host.
+RUN dnf -y update && \
+    dnf -y install gcc make elfutils-libelf-devel kernel-devel && \
+    dnf clean all
 
-# Create a directory for our source code inside the container
+# Workdir for the module sources
 WORKDIR /usr/src/app
 
-# Copy all our local files (hello-world.c, Makefile) into the container
+# Copy sources
+# Expect: hello-world.c and Makefile in the build context
 COPY . .
 
-# Run the build command inside the container
-RUN make
+# Build the kernel module (.ko)
+# The Makefile uses uname -r; inside the container it matches the installed kernel-devel.
+RUN make && \
+    # (Optional) sanity check the built artifact
+    /usr/sbin/modinfo hello-world.ko || exit 1
+
+# Produce a minimal image that just carries the built artifact
+FROM scratch AS artifact
+COPY --from=build /usr/src/app/hello-world.ko /hello-world.ko
