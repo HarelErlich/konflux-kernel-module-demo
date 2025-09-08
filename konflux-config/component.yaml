@@ -1,0 +1,21 @@
+# component.yaml
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  name: kernel-module
+  namespace: rh-ee-herlich-tenant
+  annotations:
+    # Ask Konflux to (re)configure Pipelines-as-Code in your repo
+    build.appstudio.openshift.io/request: "configure-pac"
+spec:
+  application: kernel-module-app
+  componentName: kernel-module
+  source:
+    git:
+      # Your real GitHub repo (HTTPS, ends with .git)
+      url: https://github.com/HarelErlich/konflux-kernel-module-demo.git
+      revision: main
+      context: .
+      dockerfileUrl: Dockerfile
+  # Target image location (we will create the repo/secret next)
+  containerImage: quay.io/herlich/kernel-module
