@@ -7,11 +7,16 @@ spec:
   description: >-
     This pipeline releases the kernel module artifact by repackaging it
     from the build container and publishing it to external storage.
+  
+  # Add a workspaces section to the entire pipeline
+  workspaces:
+    - name: shared-workspace
+      description: A shared workspace for all tasks.
+
   params:
     - name: snapshot
       type: string
       description: The JSON representation of the Release Snapshot.
-    # Add params for Git and S3 publishing
     - name: gitRepoURL
       type: string
       description: "Target Git repository URL for the artifact."
@@ -60,6 +65,10 @@ spec:
             value: main
           - name: pathInRepo
             value: tasks/repack-kernel-module.yaml
+      # Bind the task's "source" workspace to the pipeline's "shared-workspace"
+      workspaces:
+        - name: source
+          workspace: shared-workspace
       params:
         - name: input-image
           value: $(tasks.get-image-url.results.image-url)
@@ -76,6 +85,10 @@ spec:
             value: main
           - name: pathInRepo
             value: tasks/push-to-git.yaml
+      # Bind the task's "source" workspace to the pipeline's "shared-workspace"
+      workspaces:
+        - name: source
+          workspace: shared-workspace
       params:
         - name: kmod-artifact
           value: $(tasks.repack-kernel-module.results.kmod-artifact)
@@ -96,6 +109,10 @@ spec:
             value: main
           - name: pathInRepo
             value: tasks/push-to-s3.yaml
+      # Bind the task's "source" workspace to the pipeline's "shared-workspace"
+      workspaces:
+        - name: source
+          workspace: shared-workspace
       params:
         - name: kmod-artifact
           value: $(tasks.repack-kernel-module.results.kmod-artifact)
