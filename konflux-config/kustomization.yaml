@@ -1,0 +1,6 @@
+# konflux-config/kustomization.yaml
+resources:
+  - application.yaml
+  - component.yaml
+  - release-plan.yaml
+  - rbac.yaml
