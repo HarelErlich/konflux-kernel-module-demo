@@ -5,7 +5,6 @@ metadata:
   name: kernel-module-release-plan
   namespace: rh-ee-herlich-tenant
   labels:
-    # This label enables automatic releases after a component build and tests succeed
     release.appstudio.openshift.io/auto-release: "true"
 spec:
   application: kernel-module-app
@@ -14,28 +13,31 @@ spec:
       resolver: git
       params:
         - name: url
-          # This must be your repository URL
           value: https://github.com/HarelErlich/konflux-kernel-module-demo.git
         - name: revision
-          # The branch where the pipeline definition is located
           value: main
         - name: pathInRepo
-          # The path to the pipeline we created in the previous step
           value: konflux-config/pipelines/tenant-release-pipeline.yaml
-    # These params are passed to our tenant release pipeline
+    
+    # ADD THIS ENTIRE 'workspaces' SECTION
+    workspaces:
+      - name: shared-workspace # This name MUST match the workspace name in the Pipeline
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi # Provides a 1 Gigabyte temporary workspace
+
     params:
       - name: gitRepoURL
-        # Your artifact repository URL (without https://)
         value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
       - name: gitRepoTokenSecret
-        # The name of the secret for GitHub authentication
-        value: "git-publish-secret" 
+        value: "git-publish-secret"
       - name: s3Endpoint
-        # The S3 endpoint URL for the eu-north-1 region
         value: "https://s3.eu-north-1.amazonaws.com"
       - name: s3Bucket
-        # Your S3 bucket name
         value: "herlich-kmods-storage-20250907"
       - name: s3CredentialsSecret
-        # The name of the secret for S3 authentication
         value: "s3-publish-secret"
