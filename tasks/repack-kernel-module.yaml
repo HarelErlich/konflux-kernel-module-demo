@@ -1,0 +1,51 @@
+# tasks/repack-kernel-module.yaml
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: repack-kernel-module
+spec:
+  description: >-
+    Extracts the .ko file from a container image and repackages it as a 
+    Trusted Artifact for distribution.
+  params:
+    - name: input-image
+      type: string
+      description: >-
+        The full image pullspec of the container image produced by the
+        build task (e.g., quay.io/user/repo@sha256:...).
+  results:
+    - name: kmod-artifact
+      type: string
+      description: The resulting Trusted Artifact containing just the .ko file.
+  
+  workspaces:
+    - name: source
+      description: A workspace for task operations.
+
+  steps:
+    - name: extract-and-repack
+      image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
+      script: |
+        #!/usr/bin/env sh
+        set -ex
+
+        # Step 1: Create a temporary container from the input image
+        echo "--- Creating temporary container from $(params.input-image) ---"
+        CONTAINER_ID=$(podman create $(params.input-image))
+
+        # Step 2: Copy the .ko file from the container to our workspace
+        # The path inside the container comes from our Dockerfile
+        echo "--- Copying kernel module artifact ---"
+        podman cp $CONTAINER_ID:/usr/src/app/hello-world.ko /workspace/source/
+        echo "Copied file:"
+        ls -l /workspace/source/
+
+        # Step 3: Clean up the temporary container
+        podman rm $CONTAINER_ID
+
+        # Step 4: Create a new Trusted Artifact containing only the .ko file
+        echo "--- Creating new Trusted Artifact ---"
+        create --from /workspace/source/hello-world.ko kmod.tar.gz
+        
+        # Step 5: Output the name of the new artifact for the next Task
+        echo -n kmod.tar.gz | tee $(results.kmod-artifact.path)
