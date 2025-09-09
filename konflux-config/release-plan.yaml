@@ -3,22 +3,24 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: ReleasePlan
 metadata:
   name: kernel-module-release-plan
-  # Must be in the same namespace as your application
   namespace: rh-ee-herlich-tenant
   labels:
-    # This label enables automatic releases when tests pass
     release.appstudio.openshift.io/auto-release: "true"
 spec:
-  # The application this plan applies to
   application: kernel-module-app
-  # This is the "Tenant Release Pipeline" section
   tenantPipeline:
     pipelineRef:
-      # The name of the pipeline we created
-      name: kernel-module-release-pipeline
-    # We pass default parameters here. 
-    # These can be overridden when a specific Release is created.
+      # This tells the Release Service to fetch the pipeline from Git
+      resolver: git
+      params:
+        - name: url
+          value: "https://github.com/HarelErlich/konflux-kernel-module-demo.git"
+        - name: revision
+          value: "main" # Or the branch you are working on
+        - name: pathInRepo
+          value: "pipelines/release-pipeline.yaml" # The path to our pipeline file
     params:
+      # These are the parameters for the pipeline itself
       - name: storeInGit
         value: "true"
       - name: storeInS3
