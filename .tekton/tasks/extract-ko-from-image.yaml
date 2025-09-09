@@ -1,0 +1,53 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: extract-ko-from-image
+spec:
+  description: >
+    Extract a kernel module (.ko) from a built OCI image into the workspace.
+    Pulls by digest for immutability.
+
+  params:
+    - name: image-url
+      type: string
+      description: Base image reference (e.g. quay.io/<ns>/kernel-module)
+    - name: image-digest
+      type: string
+      description: Image digest (sha256:...)
+    - name: ko-path
+      type: string
+      default: /hello-world.ko
+      description: Absolute path of the .ko inside the image
+    - name: output-dir
+      type: string
+      default: artifacts
+      description: Directory (in workspace) to place the extracted .ko
+
+  workspaces:
+    - name: out
+      description: Destination workspace for artifacts
+
+  steps:
+    - name: pull-and-extract
+      image: quay.io/konflux-ci/release-service-utils:latest
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        IMG="$(params.image-url)@$(params.image-digest)"
+        TMPDIR="$(mktemp -d)"
+        echo "Pulling $IMG ..."
+        skopeo copy --override-os linux --override-arch amd64 \
+          "docker://${IMG}" "dir:${TMPDIR}"
+
+        mkdir -p "$(workspaces.out.path)/$(params.output-dir)"
+        if [[ -f "${TMPDIR}$(params.ko-path)" ]]; then
+          cp -v "${TMPDIR}$(params.ko-path)" "$(workspaces.out.path)/$(params.output-dir)/"
+        else
+          echo "ERROR: .ko not found at $(params.ko-path) inside image layers"
+          echo "Listing extracted tree:"
+          find "${TMPDIR}" -maxdepth 3 -type f | sed 's,^,'"${TMPDIR}"',,'
+          exit 1
+        fi
+
+        ls -l "$(workspaces.out.path)/$(params.output-dir)"
