@@ -38,7 +38,7 @@ spec:
           value: main
         - name: pathInRepo
           value: "pipelines/kernel-module-publish-pipeline.yaml"
-    serviceAccountName: release-service-account
+    serviceAccountName: build-pipeline-kernel-module
     workspaces:
       - name: ws-repack
         volumeClaimTemplate:
