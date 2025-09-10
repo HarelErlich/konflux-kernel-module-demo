@@ -27,14 +27,25 @@ spec:
       taskSpec:
         params:
           - name: snapshot
+            type: string
         results:
           - name: image-url
+            type: string
         steps:
-          - name: get-image
-            image: quay.io/konflux-ci/release-service-utils:0f82be4
+          - name: get-image-from-snapshot
+            # This image contains oc, kubectl, jq, etc.
+            image: quay.io/konflux-ci/release-service-utils:0f82be4 
             script: |
               #!/usr/bin/env sh
-              IMAGE_URL=$(echo "$(params.snapshot)" | jq -r '.components[] | select(.name == "kernel-module") | .containerImage')
+              set -ex
+
+              # The snapshot param is a namespaced name, e.g., "my-ns/my-snapshot"
+              # We use it with 'oc get' to fetch the full JSON object.
+              SNAPSHOT_JSON=$(oc get snapshot "$(params.snapshot)" -o json)
+              
+              # Now that we have the real JSON, we can use jq safely.
+              IMAGE_URL=$(echo "$SNAPSHOT_JSON" | jq -r '.spec.components[] | select(.name == "kernel-module") | .containerImage')
+              
               echo -n "$IMAGE_URL" | tee $(results.image-url.path)
       params:
         - name: snapshot
@@ -52,26 +63,40 @@ spec:
         results:
           - name: kmod-artifact
             type: string
-        volumes: # Provide a private, temporary emptyDir volume
+        volumes:
           - name: scratch-space
             emptyDir: {}
         steps:
-          - name: extract-and-repack
-            image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
-            volumeMounts: # Mount the volume to a path
+          - name: extract-ko-file
+            # Use a general-purpose image with skopeo to extract the file
+            image: quay.io/konflux-ci/release-service-utils:0f82be4 
+            volumeMounts:
               - name: scratch-space
                 mountPath: /scratch
             script: |
               #!/usr/bin/env sh
               set -ex
-              # Work inside the mounted scratch space
+              # Skopeo copies the entire image filesystem to a directory
+              skopeo copy "docker://$(params.input-image)" "dir:/scratch/image-contents"
+              
+              # Find the .ko file inside the extracted filesystem and copy it
+              find /scratch/image-contents -name 'hello-world.ko' -exec cp {} /scratch/hello-world.ko \;
+
+          - name: create-artifact
+            # Now use the specialized image just for creating the artifact
+            image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
+            volumeMounts:
+              - name: scratch-space
+                mountPath: /scratch
+            script: |
+              #!/usr/bin/env sh
+              set -ex
               cd /scratch
-              CONTAINER_ID=$(podman create $(params.input-image))
-              podman cp $CONTAINER_ID:/usr/src/app/hello-world.ko .
-              podman rm $CONTAINER_ID
+              # Create the new artifact from the extracted .ko file
               create --from hello-world.ko kmod.tar.gz
               echo -n kmod.tar.gz | tee $(results.kmod-artifact.path)
 
+    # Note: push-to-git and push-to-s3 tasks remain the same as the last version
     - name: push-to-git
       runAfter: ["repack-kernel-module"]
       params:
