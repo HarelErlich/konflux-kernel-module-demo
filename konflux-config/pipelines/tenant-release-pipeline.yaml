@@ -33,8 +33,8 @@ spec:
             type: string
         steps:
           - name: get-image-from-snapshot
-            # This image contains oc, kubectl, jq, etc.
-            image: quay.io/konflux-ci/release-service-utils:0f82be4 
+            # THIS IS THE FIX: Use an image that contains the 'oc' client
+            image: quay.io/openshift/origin-cli:latest
             script: |
               #!/usr/bin/env sh
               set -ex
@@ -44,7 +44,8 @@ spec:
               SNAPSHOT_JSON=$(oc get snapshot "$(params.snapshot)" -o json)
               
               # Now that we have the real JSON, we can use jq safely.
-              IMAGE_URL=$(echo "$SNAPSHOT_JSON" | jq -r '.spec.components[] | select(.name == "kernel-module") | .containerImage')
+              # The origin-cli image does not have jq, so we extract the value with oc jsonpath
+              IMAGE_URL=$(echo "$SNAPSHOT_JSON" | oc get -f - -o jsonpath='{.spec.components[?(@.name=="kernel-module")].containerImage}')
               
               echo -n "$IMAGE_URL" | tee $(results.image-url.path)
       params:
@@ -68,7 +69,6 @@ spec:
             emptyDir: {}
         steps:
           - name: extract-ko-file
-            # Use a general-purpose image with skopeo to extract the file
             image: quay.io/konflux-ci/release-service-utils:0f82be4 
             volumeMounts:
               - name: scratch-space
@@ -76,14 +76,10 @@ spec:
             script: |
               #!/usr/bin/env sh
               set -ex
-              # Skopeo copies the entire image filesystem to a directory
               skopeo copy "docker://$(params.input-image)" "dir:/scratch/image-contents"
-              
-              # Find the .ko file inside the extracted filesystem and copy it
               find /scratch/image-contents -name 'hello-world.ko' -exec cp {} /scratch/hello-world.ko \;
 
           - name: create-artifact
-            # Now use the specialized image just for creating the artifact
             image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
             volumeMounts:
               - name: scratch-space
@@ -92,11 +88,10 @@ spec:
               #!/usr/bin/env sh
               set -ex
               cd /scratch
-              # Create the new artifact from the extracted .ko file
               create --from hello-world.ko kmod.tar.gz
               echo -n kmod.tar.gz | tee $(results.kmod-artifact.path)
 
-    # Note: push-to-git and push-to-s3 tasks remain the same as the last version
+    # Note: push-to-git and push-to-s3 tasks remain the same
     - name: push-to-git
       runAfter: ["repack-kernel-module"]
       params:
