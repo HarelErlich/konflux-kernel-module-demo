@@ -1,65 +1,57 @@
-# tasks/push-to-git.yaml
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: push-to-git
 spec:
-  description: >-
-    Takes a built kernel module artifact and pushes it to a dedicated Git repository.
+  description: |
+    Downloads the Trusted Artifact, then pushes hello-world.ko to a Git repo.
   params:
     - name: kmod-artifact
       type: string
-      description: The Trusted Artifact containing the kernel module .ko file.
+      description: TA name produced by 'create' (e.g. kmod.tar.gz)
     - name: gitRepoURL
       type: string
-      description: "The target Git repository URL (e.g., github.com/HarelErlich/kernel-module-demo-artifacts.git)."
+      description: "Host/path only, e.g. github.com/ORG/REPO.git"
     - name: gitRepoTokenSecret
       type: string
-      description: "The name of the secret holding the Git repository token."
-  
+      description: "Secret with key 'token' for Git auth"
   workspaces:
     - name: source
-      description: A workspace for task operations.
-
+      description: Workspace
   steps:
-    - name: fetch-and-push
-      image: quay.io/konflux-ci/release-service-utils:0f82be4 # An image with git and other utils
+    - name: fetch-artifact
+      image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
       script: |
         #!/usr/bin/env sh
-        set -ex
-
-        # Step 1: Download the artifact from the repackaging stage
-        echo "--- Fetching Kernel Module Artifact ---"
-        use "$(params.kmod-artifact)=/workspace/source/kmod-dist"
-        echo "Artifact downloaded. Contents:"
-        ls -l /workspace/source/kmod-dist/
-
-        # Step 2: Setup Git and clone the target repository
-        echo "--- Cloning Target Git Repository ---"
-        git config --global user.email "konflux-ci@redhat.com"
-        git config --global user.name "Konflux CI Bot"
-        
-        # Clone the repo using the token for authentication
-        GIT_URL_WITH_AUTH="https://oauth2:$(GIT_TOKEN)@$(params.gitRepoURL)"
-        git clone "$GIT_URL_WITH_AUTH" /workspace/source/repo-clone
-        
-        # Step 3: Copy the kernel module into the repo
-        # We'll create a simple versioning scheme by timestamp
-        VERSION=$(date +%Y-%m-%d-%H%M%S)
-        mkdir -p /workspace/source/repo-clone/$VERSION
-        # The file inside the downloaded artifact is named hello-world.ko
-        cp /workspace/source/kmod-dist/hello-world.ko /workspace/source/repo-clone/$VERSION/
-        
-        # Step 4: Commit and push the new artifact
-        echo "--- Committing and Pushing Artifact ---"
-        cd /workspace/source/repo-clone
-        git add .
-        git commit -m "feat: Add kernel module version $VERSION"
-        git push origin main
-        echo "--- Successfully pushed to Git ---"
+        set -eux
+        DEST="$(workspaces.source.path)/kmod-dist"
+        use "$(params.kmod-artifact)=${DEST}"
+        ls -l "${DEST}"
+    - name: push
+      # Any image with git and sh will do; keeping yours:
+      image: quay.io/konflux-ci/release-service-utils:0f82be4
       env:
         - name: GIT_TOKEN
           valueFrom:
             secretKeyRef:
               name: $(params.gitRepoTokenSecret)
-              key: token # The secret should contain a key named 'token'
+              key: token
+      script: |
+        #!/usr/bin/env sh
+        set -eux
+        git config --global user.email "konflux-ci@redhat.com"
+        git config --global user.name "Konflux CI Bot"
+
+        REPO_URL="https://oauth2:${GIT_TOKEN}@$(params.gitRepoURL)"
+        CLONE_DIR="$(workspaces.source.path)/repo-clone"
+        mkdir -p "${CLONE_DIR}"
+        git clone "${REPO_URL}" "${CLONE_DIR}"
+
+        VERSION="$(date +%Y-%m-%d-%H%M%S)"
+        mkdir -p "${CLONE_DIR}/${VERSION}"
+        cp "$(workspaces.source.path)/kmod-dist/hello-world.ko" "${CLONE_DIR}/${VERSION}/"
+
+        cd "${CLONE_DIR}"
+        git add .
+        git commit -m "feat: add kernel module ${VERSION}"
+        git push origin main

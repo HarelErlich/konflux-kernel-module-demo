@@ -1,51 +1,44 @@
-# tasks/repack-kernel-module.yaml
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: repack-kernel-module
 spec:
-  description: >-
-    Extracts the .ko file from a container image and repackages it as a 
-    Trusted Artifact for distribution.
+  description: |
+    Extracts hello-world.ko from a container image (no podman),
+    then re-packages it as a Trusted Artifact for downstream tasks.
   params:
     - name: input-image
       type: string
-      description: >-
-        The full image pullspec of the container image produced by the
-        build task (e.g., quay.io/user/repo@sha256:...).
+      description: Fully-qualified image with digest (e.g. quay.io/...@sha256:...)
   results:
     - name: kmod-artifact
       type: string
-      description: The resulting Trusted Artifact containing just the .ko file.
-  
+      description: Trusted Artifact name to be consumed by "use"
   workspaces:
     - name: source
-      description: A workspace for task operations.
-
+      description: Workspace for intermediate files
   steps:
-    - name: extract-and-repack
+    - name: extract-ko
+      # crane can export the image filesystem as a tar to stdout
+      image: gcr.io/go-containerregistry/crane:debug
+      script: |
+        #!/busybox/sh
+        set -euxo pipefail
+        DEST_DIR="$(workspaces.source.path)/extracted"
+        mkdir -p "${DEST_DIR}"
+        # Export the image and extract the module file
+        crane export "$(params.input-image)" - \
+          | tar -x -C "${DEST_DIR}" usr/src/app/hello-world.ko
+        ls -l "${DEST_DIR}"
+
+    - name: create-ta
+      # This image provides the 'create' CLI for Trusted Artifacts
       image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
       script: |
         #!/usr/bin/env sh
-        set -ex
-
-        # Step 1: Create a temporary container from the input image
-        echo "--- Creating temporary container from $(params.input-image) ---"
-        CONTAINER_ID=$(podman create $(params.input-image))
-
-        # Step 2: Copy the .ko file from the container to our workspace
-        # The path inside the container comes from our Dockerfile
-        echo "--- Copying kernel module artifact ---"
-        podman cp $CONTAINER_ID:/usr/src/app/hello-world.ko /workspace/source/
-        echo "Copied file:"
-        ls -l /workspace/source/
-
-        # Step 3: Clean up the temporary container
-        podman rm $CONTAINER_ID
-
-        # Step 4: Create a new Trusted Artifact containing only the .ko file
-        echo "--- Creating new Trusted Artifact ---"
-        create --from /workspace/source/hello-world.ko kmod.tar.gz
-        
-        # Step 5: Output the name of the new artifact for the next Task
-        echo -n kmod.tar.gz | tee $(results.kmod-artifact.path)
+        set -eux
+        SRC="$(workspaces.source.path)/extracted/usr/src/app/hello-world.ko"
+        # Create a TA named 'kmod.tar.gz' from the single file
+        create --from "${SRC}" kmod.tar.gz
+        # Expose the TA name to downstream tasks
+        echo -n "kmod.tar.gz" > "$(results.kmod-artifact.path)"

@@ -1,58 +1,51 @@
-# tasks/push-to-s3.yaml
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: push-to-s3
 spec:
-  description: >-
-    Takes a built kernel module artifact and pushes it to a pre-configured S3 bucket.
+  description: |
+    Downloads the Trusted Artifact, then uploads hello-world.ko to S3.
   params:
     - name: kmod-artifact
       type: string
-      description: The Trusted Artifact containing the kernel module .ko file.
+      description: TA name produced by 'create' (e.g. kmod.tar.gz)
     - name: s3Endpoint
       type: string
-      description: "The S3 endpoint URL (e.g., https://s3.us-east-1.amazonaws.com)."
     - name: s3Bucket
       type: string
-      description: "The destination S3 bucket name."
     - name: s3CredentialsSecret
       type: string
-      description: "The name of the secret holding S3 credentials (aws_access_key_id, aws_secret_access_key)."
-
+      description: Secret with keys aws_access_key_id and aws_secret_access_key
   workspaces:
     - name: source
-      description: A workspace for task operations.
-
+      description: Workspace
   steps:
-    - name: fetch-and-upload
-      image: amazon/aws-cli:2.13.13 # Official AWS CLI v2 image
+    - name: fetch-artifact
+      image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
       script: |
         #!/usr/bin/env sh
-        set -ex
-
-        # Step 1: Download the artifact from the repackaging stage
-        echo "--- Fetching Kernel Module Artifact ---"
-        use "$(params.kmod-artifact)=/workspace/source/kmod-dist"
-        echo "Artifact downloaded. Contents:"
-        ls -l /workspace/source/kmod-dist/
-
-        # Step 2: Upload the kernel module to the S3 bucket
-        echo "--- Uploading to S3 Bucket: $(params.s3Bucket) ---"
-        # The aws cli will automatically use the credentials from the environment variables
-        VERSION=$(date +%Y-%m-%d-%H%M%S)
-        # The file inside the downloaded artifact is named hello-world.ko
-        aws s3 cp /workspace/source/kmod-dist/hello-world.ko s3://$(params.s3Bucket)/$VERSION/hello-world.ko --endpoint-url $(params.s3Endpoint)
-
-        echo "--- Successfully uploaded to S3 ---"
+        set -eux
+        DEST="$(workspaces.source.path)/kmod-dist"
+        use "$(params.kmod-artifact)=${DEST}"
+        ls -l "${DEST}"
+    - name: upload
+      image: amazon/aws-cli:2.13.13
       env:
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
               name: $(params.s3CredentialsSecret)
-              key: aws_access_key_id # The secret must contain this key
+              key: aws_access_key_id
         - name: AWS_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
               name: $(params.s3CredentialsSecret)
-              key: aws_secret_access_key # The secret must contain this key
+              key: aws_secret_access_key
+      script: |
+        #!/usr/bin/env sh
+        set -eux
+        VERSION="$(date +%Y-%m-%d-%H%M%S)"
+        aws s3 cp \
+          "$(workspaces.source.path)/kmod-dist/hello-world.ko" \
+          "s3://$(params.s3Bucket)/${VERSION}/hello-world.ko" \
+          --endpoint-url "$(params.s3Endpoint)"
