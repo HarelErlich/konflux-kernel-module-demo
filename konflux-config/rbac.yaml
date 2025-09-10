@@ -9,6 +9,10 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch"]
+  # THIS IS THE FIX: Also allow the pipeline to read snapshots
+  - apiGroups: ["appstudio.redhat.com"]
+    resources: ["snapshots"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -20,6 +24,6 @@ roleRef:
   kind: Role
   name: tenant-release-pipeline-role
 subjects:
-  # This binds the role to the default pipeline service account
+  # THIS IS THE FIX: Bind the role to the correct service account
   - kind: ServiceAccount
-    name: pipeline
+    name: appstudio-pipeline
