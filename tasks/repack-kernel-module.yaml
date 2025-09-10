@@ -32,13 +32,14 @@ spec:
         ls -l "${DEST_DIR}"
 
     - name: create-ta
-      # This image provides the 'create' CLI for Trusted Artifacts
-      image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
+      # Create a simple tar.gz file instead of using Trusted Artifacts
+      image: busybox:latest
       script: |
-        #!/usr/bin/env sh
+        #!/busybox/sh
         set -eux
         SRC="$(workspaces.source.path)/extracted/hello-world.ko"
-        # Create a TA named 'kmod.tar.gz' from the single file
-        create --from "${SRC}" kmod.tar.gz
-        # Expose the TA name to downstream tasks
+        # Create a simple tar.gz file
+        cd "$(workspaces.source.path)"
+        tar -czf kmod.tar.gz -C extracted hello-world.ko
+        # Expose the artifact name to downstream tasks
         echo -n "kmod.tar.gz" > "$(results.kmod-artifact.path)"

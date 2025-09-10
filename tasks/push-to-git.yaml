@@ -20,12 +20,15 @@ spec:
       description: Workspace
   steps:
     - name: fetch-artifact
-      image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
+      image: busybox:latest
       script: |
-        #!/usr/bin/env sh
+        #!/busybox/sh
         set -eux
         DEST="$(workspaces.source.path)/kmod-dist"
-        use "$(params.kmod-artifact)=${DEST}"
+        mkdir -p "${DEST}"
+        # Extract the tar.gz file
+        cd "$(workspaces.source.path)"
+        tar -xzf "$(params.kmod-artifact)" -C "${DEST}"
         ls -l "${DEST}"
     - name: push
       # Any image with git and sh will do; keeping yours:
