@@ -22,7 +22,7 @@ spec:
     - name: fetch-artifact
       image: busybox:latest
       script: |
-        #!/busybox/sh
+        #!/bin/sh
         set -eux
         DEST="$(workspaces.source.path)/kmod-dist"
         mkdir -p "${DEST}"
