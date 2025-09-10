@@ -8,33 +8,21 @@ spec:
     This pipeline releases the kernel module artifact by repackaging it
     from the build container and publishing it to external storage.
   
-  # Add a workspaces section to the entire pipeline
-  workspaces:
-    - name: shared-workspace
-      description: A shared workspace for all tasks.
-
   params:
     - name: snapshot
       type: string
-      description: The JSON representation of the Release Snapshot.
     - name: gitRepoURL
       type: string
-      description: "Target Git repository URL for the artifact."
     - name: gitRepoTokenSecret
       type: string
-      description: "Secret containing the Git repository token."
     - name: s3Endpoint
       type: string
-      description: "The S3 endpoint URL."
     - name: s3Bucket
       type: string
-      description: "The destination S3 bucket name."
     - name: s3CredentialsSecret
       type: string
-      description: "Secret holding S3 credentials."
 
   tasks:
-    # Task 1: Find the container image from the snapshot
     - name: get-image-url
       taskSpec:
         params:
@@ -46,49 +34,47 @@ spec:
             image: quay.io/konflux-ci/release-service-utils:0f82be4
             script: |
               #!/usr/bin/env sh
-              # The snapshot contains a list of all components. We find ours by name.
               IMAGE_URL=$(echo "$(params.snapshot)" | jq -r '.components[] | select(.name == "kernel-module") | .containerImage')
               echo -n "$IMAGE_URL" | tee $(results.image-url.path)
       params:
         - name: snapshot
           value: $(params.snapshot)
 
-    # Task 2: Repackage the .ko file from the container image
     - name: repack-kernel-module
       runAfter: ["get-image-url"]
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/HarelErlich/konflux-kernel-module-demo.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: tasks/repack-kernel-module.yaml
-      # Bind the task's "source" workspace to the pipeline's "shared-workspace"
-      workspaces:
-        - name: source
-          workspace: shared-workspace
       params:
         - name: input-image
           value: $(tasks.get-image-url.results.image-url)
+      taskSpec: # Using embedded taskSpec instead of taskRef
+        params:
+          - name: input-image
+            type: string
+        results:
+          - name: kmod-artifact
+            type: string
+        workspaces: # Declare the workspace inside the task spec
+          - name: source
+        volumes: # Provide a temporary emptyDir volume for this task
+          - name: source-volume
+            emptyDir: {}
+        steps:
+          - name: extract-and-repack
+            image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
+            workingDir: /workspace/source # Mount the volume here
+            script: |
+              #!/usr/bin/env sh
+              set -ex
+              CONTAINER_ID=$(podman create $(params.input-image))
+              podman cp $CONTAINER_ID:/usr/src/app/hello-world.ko .
+              podman rm $CONTAINER_ID
+              create --from hello-world.ko kmod.tar.gz
+              echo -n kmod.tar.gz | tee $(results.kmod-artifact.path)
+            volumeMounts:
+              - name: source-volume
+                mountPath: /workspace/source
 
-    # Task 3: Push the repackaged artifact to Git
     - name: push-to-git
       runAfter: ["repack-kernel-module"]
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/HarelErlich/konflux-kernel-module-demo.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: tasks/push-to-git.yaml
-      # Bind the task's "source" workspace to the pipeline's "shared-workspace"
-      workspaces:
-        - name: source
-          workspace: shared-workspace
       params:
         - name: kmod-artifact
           value: $(tasks.repack-kernel-module.results.kmod-artifact)
@@ -96,23 +82,50 @@ spec:
           value: $(params.gitRepoURL)
         - name: gitRepoTokenSecret
           value: $(params.gitRepoTokenSecret)
+      taskSpec: # Using embedded taskSpec instead of taskRef
+        params:
+          - name: kmod-artifact
+            type: string
+          - name: gitRepoURL
+            type: string
+          - name: gitRepoTokenSecret
+            type: string
+        workspaces:
+          - name: source
+        volumes:
+          - name: source-volume
+            emptyDir: {}
+        steps:
+          - name: fetch-and-push
+            image: quay.io/konflux-ci/release-service-utils:0f82be4
+            workingDir: /workspace/source
+            script: |
+              #!/usr/bin/env sh
+              set -ex
+              use "$(params.kmod-artifact)=./kmod-dist"
+              git config --global user.email "konflux-ci@redhat.com"
+              git config --global user.name "Konflux CI Bot"
+              GIT_URL_WITH_AUTH="https://oauth2:$(GIT_TOKEN)@$(params.gitRepoURL)"
+              git clone "$GIT_URL_WITH_AUTH" ./repo-clone
+              VERSION=$(date +%Y-%m-%d-%H%M%S)
+              mkdir -p ./repo-clone/$VERSION
+              cp ./kmod-dist/hello-world.ko ./repo-clone/$VERSION/
+              cd ./repo-clone
+              git add .
+              git commit -m "feat: Add kernel module version $VERSION"
+              git push origin main
+            env:
+              - name: GIT_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(params.gitRepoTokenSecret)
+                    key: token
+            volumeMounts:
+              - name: source-volume
+                mountPath: /workspace/source
 
-    # Task 4: Push the repackaged artifact to S3
     - name: push-to-s3
       runAfter: ["repack-kernel-module"]
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/HarelErlich/konflux-kernel-module-demo.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: tasks/push-to-s3.yaml
-      # Bind the task's "source" workspace to the pipeline's "shared-workspace"
-      workspaces:
-        - name: source
-          workspace: shared-workspace
       params:
         - name: kmod-artifact
           value: $(tasks.repack-kernel-module.results.kmod-artifact)
@@ -122,3 +135,42 @@ spec:
           value: $(params.s3Bucket)
         - name: s3CredentialsSecret
           value: $(params.s3CredentialsSecret)
+      taskSpec: # Using embedded taskSpec instead of taskRef
+        params:
+          - name: kmod-artifact
+            type: string
+          - name: s3Endpoint
+            type: string
+          - name: s3Bucket
+            type: string
+          - name: s3CredentialsSecret
+            type: string
+        workspaces:
+          - name: source
+        volumes:
+          - name: source-volume
+            emptyDir: {}
+        steps:
+          - name: fetch-and-upload
+            image: amazon/aws-cli:2.13.13
+            workingDir: /workspace/source
+            script: |
+              #!/usr/bin/env sh
+              set -ex
+              use "$(params.kmod-artifact)=./kmod-dist"
+              VERSION=$(date +%Y-%m-%d-%H%M%S)
+              aws s3 cp ./kmod-dist/hello-world.ko s3://$(params.s3Bucket)/$VERSION/hello-world.ko --endpoint-url $(params.s3Endpoint)
+            env:
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: $(params.s3CredentialsSecret)
+                    key: aws_access_key_id
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: $(params.s3CredentialsSecret)
+                    key: aws_secret_access_key
+            volumeMounts:
+              - name: source-volume
+                mountPath: /workspace/source
