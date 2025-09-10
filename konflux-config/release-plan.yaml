@@ -18,18 +18,8 @@ spec:
           value: main
         - name: pathInRepo
           value: konflux-config/pipelines/tenant-release-pipeline.yaml
-    
-    # ADD THIS ENTIRE 'workspaces' SECTION
-    workspaces:
-      - name: shared-workspace # This name MUST match the workspace name in the Pipeline
-        volumeClaimTemplate:
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi # Provides a 1 Gigabyte temporary workspace
-
+    # THIS IS THE FIX: Explicitly run the pipeline with our new ServiceAccount
+    serviceAccountName: tenant-release-sa
     params:
       - name: gitRepoURL
         value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
