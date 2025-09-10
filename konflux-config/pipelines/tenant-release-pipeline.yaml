@@ -45,33 +45,32 @@ spec:
       params:
         - name: input-image
           value: $(tasks.get-image-url.results.image-url)
-      taskSpec: # Using embedded taskSpec instead of taskRef
+      taskSpec:
         params:
           - name: input-image
             type: string
         results:
           - name: kmod-artifact
             type: string
-        workspaces: # Declare the workspace inside the task spec
-          - name: source
-        volumes: # Provide a temporary emptyDir volume for this task
-          - name: source-volume
+        volumes: # Provide a private, temporary emptyDir volume
+          - name: scratch-space
             emptyDir: {}
         steps:
           - name: extract-and-repack
             image: quay.io/redhat-appstudio/build-trusted-artifacts:latest
-            workingDir: /workspace/source # Mount the volume here
+            volumeMounts: # Mount the volume to a path
+              - name: scratch-space
+                mountPath: /scratch
             script: |
               #!/usr/bin/env sh
               set -ex
+              # Work inside the mounted scratch space
+              cd /scratch
               CONTAINER_ID=$(podman create $(params.input-image))
               podman cp $CONTAINER_ID:/usr/src/app/hello-world.ko .
               podman rm $CONTAINER_ID
               create --from hello-world.ko kmod.tar.gz
               echo -n kmod.tar.gz | tee $(results.kmod-artifact.path)
-            volumeMounts:
-              - name: source-volume
-                mountPath: /workspace/source
 
     - name: push-to-git
       runAfter: ["repack-kernel-module"]
@@ -82,7 +81,7 @@ spec:
           value: $(params.gitRepoURL)
         - name: gitRepoTokenSecret
           value: $(params.gitRepoTokenSecret)
-      taskSpec: # Using embedded taskSpec instead of taskRef
+      taskSpec:
         params:
           - name: kmod-artifact
             type: string
@@ -90,18 +89,19 @@ spec:
             type: string
           - name: gitRepoTokenSecret
             type: string
-        workspaces:
-          - name: source
         volumes:
-          - name: source-volume
+          - name: scratch-space
             emptyDir: {}
         steps:
           - name: fetch-and-push
             image: quay.io/konflux-ci/release-service-utils:0f82be4
-            workingDir: /workspace/source
+            volumeMounts:
+              - name: scratch-space
+                mountPath: /scratch
             script: |
               #!/usr/bin/env sh
               set -ex
+              cd /scratch
               use "$(params.kmod-artifact)=./kmod-dist"
               git config --global user.email "konflux-ci@redhat.com"
               git config --global user.name "Konflux CI Bot"
@@ -120,9 +120,6 @@ spec:
                   secretKeyRef:
                     name: $(params.gitRepoTokenSecret)
                     key: token
-            volumeMounts:
-              - name: source-volume
-                mountPath: /workspace/source
 
     - name: push-to-s3
       runAfter: ["repack-kernel-module"]
@@ -135,7 +132,7 @@ spec:
           value: $(params.s3Bucket)
         - name: s3CredentialsSecret
           value: $(params.s3CredentialsSecret)
-      taskSpec: # Using embedded taskSpec instead of taskRef
+      taskSpec:
         params:
           - name: kmod-artifact
             type: string
@@ -145,18 +142,19 @@ spec:
             type: string
           - name: s3CredentialsSecret
             type: string
-        workspaces:
-          - name: source
         volumes:
-          - name: source-volume
+          - name: scratch-space
             emptyDir: {}
         steps:
           - name: fetch-and-upload
             image: amazon/aws-cli:2.13.13
-            workingDir: /workspace/source
+            volumeMounts:
+              - name: scratch-space
+                mountPath: /scratch
             script: |
               #!/usr/bin/env sh
               set -ex
+              cd /scratch
               use "$(params.kmod-artifact)=./kmod-dist"
               VERSION=$(date +%Y-%m-%d-%H%M%S)
               aws s3 cp ./kmod-dist/hello-world.ko s3://$(params.s3Bucket)/$VERSION/hello-world.ko --endpoint-url $(params.s3Endpoint)
@@ -171,6 +169,3 @@ spec:
                   secretKeyRef:
                     name: $(params.s3CredentialsSecret)
                     key: aws_secret_access_key
-            volumeMounts:
-              - name: source-volume
-                mountPath: /workspace/source
