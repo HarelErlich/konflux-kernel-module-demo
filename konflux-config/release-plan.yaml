@@ -1,22 +1,17 @@
+# konflux-config/release-plan.yaml (גרסה מתוקנת)
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: ReleasePlan
 metadata:
   labels:
-    release.appstudio.openshift.io/auto-release: 'true' 
+    release.appstudio.openshift.io/auto-release: 'true'
     release.appstudio.openshift.io/standing-attribution: 'true'
   name: kernel-module-publish
   namespace: rh-ee-herlich-tenant
 spec:
   application: kernel-module-app
-  data:
-    mapping:
-      components: 
-        - name: kernel-module
-          repository: quay.io/herlich/kernel-module
-          tags: [latest]
   target: rh-ee-herlich-tenant
   tenantPipeline:
-    params: 
+    params:
       - name: input-image
         value: "$(params.snapshot.components[0].containerImage)"
       - name: gitRepoURL
@@ -29,7 +24,7 @@ spec:
         value: "kernel-modules-artifacts"
       - name: s3CredentialsSecret
         value: "s3-publish-secret"
-    pipelineRef: 
+    pipelineRef:
       resolver: git
       params:
         - name: url
