@@ -28,7 +28,7 @@ spec:
         mkdir -p "${DEST_DIR}"
         # Export the image and extract the module file
         crane export "$(params.input-image)" - \
-          | tar -x -C "${DEST_DIR}" usr/src/app/hello-world.ko
+          | tar -x -C "${DEST_DIR}" hello-world.ko
         ls -l "${DEST_DIR}"
 
     - name: create-ta
@@ -37,7 +37,7 @@ spec:
       script: |
         #!/usr/bin/env sh
         set -eux
-        SRC="$(workspaces.source.path)/extracted/usr/src/app/hello-world.ko"
+        SRC="$(workspaces.source.path)/extracted/hello-world.ko"
         # Create a TA named 'kmod.tar.gz' from the single file
         create --from "${SRC}" kmod.tar.gz
         # Expose the TA name to downstream tasks
