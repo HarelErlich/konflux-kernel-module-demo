@@ -26,9 +26,14 @@ spec:
         set -eux
         DEST="$(workspaces.source.path)/kmod-dist"
         mkdir -p "${DEST}"
+        # The artifact should be passed as a full path, but let's handle both cases
+        ARTIFACT_PATH="$(params.kmod-artifact)"
+        if [ ! -f "${ARTIFACT_PATH}" ]; then
+          # Try relative to workspace
+          ARTIFACT_PATH="$(workspaces.source.path)/$(params.kmod-artifact)"
+        fi
         # Extract the tar.gz file
-        cd "$(workspaces.source.path)"
-        tar -xzf "$(params.kmod-artifact)" -C "${DEST}"
+        tar -xzf "${ARTIFACT_PATH}" -C "${DEST}"
         ls -l "${DEST}"
     - name: push
       # Any image with git and sh will do; keeping yours:

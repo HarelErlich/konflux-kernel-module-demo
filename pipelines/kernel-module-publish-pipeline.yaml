@@ -76,7 +76,7 @@ spec:
           value: "$(params.gitRepoTokenSecret)"
       workspaces:
         - name: source
-          workspace: ws-publish
+          workspace: ws-repack
 
     - name: push-to-s3
       runAfter: [repack-kernel-module]
@@ -100,4 +100,4 @@ spec:
           value: "$(params.s3CredentialsSecret)"
       workspaces:
         - name: source
-          workspace: ws-publish
+          workspace: ws-repack
