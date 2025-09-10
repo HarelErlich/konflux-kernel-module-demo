@@ -19,3 +19,6 @@ spec:
       dockerfileUrl: Dockerfile
   # Target image location (we will create the repo/secret next)
   containerImage: quay.io/herlich/kernel-module
+  secrets:
+    - name: quay-robot-push
+      mountPath: /etc/secrets/quay
