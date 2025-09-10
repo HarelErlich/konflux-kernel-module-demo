@@ -33,18 +33,20 @@ spec:
             type: string
         steps:
           - name: get-image-from-snapshot
-            # THIS IS THE FIX: Use an image that contains the 'oc' client
             image: quay.io/openshift/origin-cli:latest
             script: |
               #!/usr/bin/env sh
               set -ex
 
-              # The snapshot param is a namespaced name, e.g., "my-ns/my-snapshot"
-              # We use it with 'oc get' to fetch the full JSON object.
-              SNAPSHOT_JSON=$(oc get snapshot "$(params.snapshot)" -o json)
+              # THIS IS THE FIX: Parse the namespaced name into separate variables
+              SNAPSHOT_PARAM="$(params.snapshot)"
+              SNAPSHOT_NAMESPACE=$(echo "$SNAPSHOT_PARAM" | cut -d'/' -f1)
+              SNAPSHOT_NAME=$(echo "$SNAPSHOT_PARAM" | cut -d'/' -f2)
+
+              # Build and run the correct 'oc get' command
+              SNAPSHOT_JSON=$(oc get snapshot "$SNAPSHOT_NAME" -n "$SNAPSHOT_NAMESPACE" -o json)
               
-              # Now that we have the real JSON, we can use jq safely.
-              # The origin-cli image does not have jq, so we extract the value with oc jsonpath
+              # Use oc jsonpath to extract the value
               IMAGE_URL=$(echo "$SNAPSHOT_JSON" | oc get -f - -o jsonpath='{.spec.components[?(@.name=="kernel-module")].containerImage}')
               
               echo -n "$IMAGE_URL" | tee $(results.image-url.path)
@@ -52,6 +54,7 @@ spec:
         - name: snapshot
           value: $(params.snapshot)
 
+    # The rest of the pipeline remains exactly the same as the previous version
     - name: repack-kernel-module
       runAfter: ["get-image-url"]
       params:
@@ -91,7 +94,6 @@ spec:
               create --from hello-world.ko kmod.tar.gz
               echo -n kmod.tar.gz | tee $(results.kmod-artifact.path)
 
-    # Note: push-to-git and push-to-s3 tasks remain the same
     - name: push-to-git
       runAfter: ["repack-kernel-module"]
       params:
