@@ -33,7 +33,7 @@ spec:
           value: main
         - name: pathInRepo
           value: "pipelines/kernel-module-publish-pipeline.yaml"
-    serviceAccountName: build-pipeline-kernel-module
+    serviceAccountName: appstudio-pipeline
     workspaces:
       - name: ws-repack
         volumeClaimTemplate:
