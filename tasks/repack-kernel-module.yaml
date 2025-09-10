@@ -35,7 +35,7 @@ spec:
       # Create a simple tar.gz file instead of using Trusted Artifacts
       image: busybox:latest
       script: |
-        #!/busybox/sh
+        #!/bin/sh
         set -eux
         SRC="$(workspaces.source.path)/extracted/hello-world.ko"
         # Create a simple tar.gz file
