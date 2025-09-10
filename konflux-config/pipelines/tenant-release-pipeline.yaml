@@ -9,6 +9,7 @@ spec:
     from the build container and publishing it to external storage.
   
   params:
+    # We are now expecting the full Snapshot JSON object here, not just its name.
     - name: snapshot
       type: string
     - name: gitRepoURL
@@ -33,28 +34,33 @@ spec:
             type: string
         steps:
           - name: get-image-from-snapshot
-            image: quay.io/openshift/origin-cli:latest
+            # We only need jq now, which is in the release-service-utils image
+            image: quay.io/konflux-ci/release-service-utils:0f82be4 
             script: |
               #!/usr/bin/env sh
               set -ex
 
-              # THIS IS THE FIX: Parse the namespaced name into separate variables
-              SNAPSHOT_PARAM="$(params.snapshot)"
-              SNAPSHOT_NAMESPACE=$(echo "$SNAPSHOT_PARAM" | cut -d'/' -f1)
-              SNAPSHOT_NAME=$(echo "$SNAPSHOT_PARAM" | cut -d'/' -f2)
+              # THIS IS THE FIX: The snapshot parameter is the full JSON object.
+              # We can parse it directly with jq without needing 'oc'.
+              echo "Received snapshot object:"
+              echo "$(params.snapshot)"
 
-              # Build and run the correct 'oc get' command
-              SNAPSHOT_JSON=$(oc get snapshot "$SNAPSHOT_NAME" -n "$SNAPSHOT_NAMESPACE" -o json)
+              IMAGE_URL=$(echo "$(params.snapshot)" | jq -r '.components[] | select(.name == "kernel-module") | .containerImage')
               
-              # Use oc jsonpath to extract the value
-              IMAGE_URL=$(echo "$SNAPSHOT_JSON" | oc get -f - -o jsonpath='{.spec.components[?(@.name=="kernel-module")].containerImage}')
-              
+              if [ -z "$IMAGE_URL" ]; then
+                echo "Error: Could not find containerImage for component 'kernel-module' in snapshot."
+                exit 1
+              fi
+
+              echo "Found image URL: $IMAGE_URL"
               echo -n "$IMAGE_URL" | tee $(results.image-url.path)
       params:
         - name: snapshot
-          value: $(params.snapshot)
+          # The release service automatically passes a parameter named 'snapshot_spec'
+          # containing the full JSON object. We map it to our 'snapshot' param.
+          value: $(params.snapshot_spec)
 
-    # The rest of the pipeline remains exactly the same as the previous version
+    # The rest of the pipeline remains exactly the same
     - name: repack-kernel-module
       runAfter: ["get-image-url"]
       params:
@@ -96,6 +102,7 @@ spec:
 
     - name: push-to-git
       runAfter: ["repack-kernel-module"]
+      # ... (rest of the task is unchanged)
       params:
         - name: kmod-artifact
           value: $(tasks.repack-kernel-module.results.kmod-artifact)
@@ -145,6 +152,7 @@ spec:
 
     - name: push-to-s3
       runAfter: ["repack-kernel-module"]
+      # ... (rest of the task is unchanged)
       params:
         - name: kmod-artifact
           value: $(tasks.repack-kernel-module.results.kmod-artifact)
