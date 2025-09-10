@@ -1,0 +1,58 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlan
+metadata:
+  labels:
+    release.appstudio.openshift.io/auto-release: 'true' 
+    release.appstudio.openshift.io/standing-attribution: 'true'
+  name: kernel-module-publish
+  namespace: rh-ee-herlich-tenant
+spec:
+  application: kernel-module-app
+  data:
+    mapping:
+      components: 
+        - name: kernel-module
+          repository: quay.io/herlich/kernel-module
+          tags: [latest]
+  target: rh-ee-herlich-tenant
+  tenantPipeline:
+    params: 
+      - name: input-image
+        value: "$(params.snapshot.components[0].containerImage)"
+      - name: gitRepoURL
+        value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
+      - name: gitRepoTokenSecret
+        value: "git-publish-secret"
+      - name: s3Endpoint
+        value: "https://s3.us-east-1.amazonaws.com"
+      - name: s3Bucket
+        value: "kernel-modules-artifacts"
+      - name: s3CredentialsSecret
+        value: "s3-publish-secret"
+    pipelineRef: 
+      resolver: git
+      params:
+        - name: url
+          value: "https://github.com/HarelErlich/konflux-kernel-module-demo.git"
+        - name: revision
+          value: main
+        - name: pathInRepo
+          value: "pipelines/kernel-module-publish-pipeline.yaml"
+    serviceAccountName: release-service-account
+    workspaces:
+      - name: ws-repack
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+      - name: ws-publish
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
