@@ -1,0 +1,31 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: tenant-publish-pipeline-
+  namespace: rh-ee-herlich-tenant
+spec:
+  serviceAccountName: build-pipeline-kernel-module  # Same SA your build uses
+  pipelineRef:
+    name: tenant-publish-pipeline
+  params:
+    - name: input-image
+      # Use IMAGE_URL@IMAGE_DIGEST from your last build
+      value: "quay.io/herlich/kernel-module@sha256:6658c812fc6caf87b1ad91adc775171b0b14aae8f7929c49473509e9535b8672"
+    - name: gitRepoURL
+      value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
+    - name: gitRepoTokenSecret
+      value: "git-publish-secret"
+    - name: s3Endpoint
+      value: "https://s3.us-east-1.amazonaws.com"
+    - name: s3Bucket
+      value: "my-demo-kmod-bucket"
+    - name: s3CredentialsSecret
+      value: "s3-publish-secret"
+  # Bind each workspace to its own emptyDir to avoid cross-task sharing
+  workspaces:
+    - name: ws-repack
+      emptyDir: {}
+    - name: ws-publish
+      emptyDir: {}
+  timeouts:
+    pipeline: 2h0m0s

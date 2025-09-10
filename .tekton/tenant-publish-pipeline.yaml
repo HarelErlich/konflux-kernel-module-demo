@@ -1,0 +1,102 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: tenant-publish-pipeline
+  # No PaC triggers here; this is a utility pipeline you run explicitly
+spec:
+  description: >
+    Repackage the built kernel module from a container image and publish it to Git and S3.
+    Tasks are resolved from Git via the Tekton "git" resolver.
+
+  params:
+    - name: input-image
+      type: string
+      description: "Image pullspec with digest, e.g. quay.io/herlich/kernel-module@sha256:..."
+    - name: gitRepoURL
+      type: string
+      description: "Target Git repo host/path (no scheme), e.g. github.com/HarelErlich/kernel-module-demo-artifacts.git"
+    - name: gitRepoTokenSecret
+      type: string
+      default: git-publish-secret
+      description: "K8s Secret name with key 'token' for Git push auth"
+    - name: s3Endpoint
+      type: string
+      description: "S3 endpoint, e.g. https://s3.us-east-1.amazonaws.com"
+    - name: s3Bucket
+      type: string
+      description: "Destination S3 bucket"
+    - name: s3CredentialsSecret
+      type: string
+      default: s3-publish-secret
+      description: "K8s Secret name with aws_access_key_id / aws_secret_access_key"
+
+  # Define two independent workspaces so each task gets an isolated emptyDir
+  workspaces:
+    - name: ws-repack
+    - name: ws-publish
+
+  tasks:
+    - name: repack-kernel-module
+      # NOTE: Resolve task YAML from Git (this repo), at path tasks/repack-kernel-module.yaml
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: "https://github.com/HarelErlich/konflux-kernel-module-demo.git"  # repo containing the task files
+          - name: revision
+            value: "main"  # pin to a branch/commit; in production prefer a specific commit SHA
+          - name: pathInRepo
+            value: "tasks/repack-kernel-module.yaml"
+      params:
+        - name: input-image
+          value: "$(params.input-image)"
+      workspaces:
+        - name: source
+          workspace: ws-repack
+
+    - name: push-to-git
+      runAfter: [repack-kernel-module]
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: "https://github.com/HarelErlich/konflux-kernel-module-demo.git"
+          - name: revision
+            value: "main"
+          - name: pathInRepo
+            value: "tasks/push-to-git.yaml"
+      params:
+        # IMPORTANT: repack task must output a Trusted Artifact URI in its result
+        - name: kmod-artifact
+          value: "$(tasks.repack-kernel-module.results.kmod-artifact)"
+        - name: gitRepoURL
+          value: "$(params.gitRepoURL)"
+        - name: gitRepoTokenSecret
+          value: "$(params.gitRepoTokenSecret)"
+      workspaces:
+        - name: source
+          workspace: ws-publish
+
+    - name: push-to-s3
+      runAfter: [repack-kernel-module]
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: "https://github.com/HarelErlich/konflux-kernel-module-demo.git"
+          - name: revision
+            value: "main"
+          - name: pathInRepo
+            value: "tasks/push-to-s3.yaml"
+      params:
+        - name: kmod-artifact
+          value: "$(tasks.repack-kernel-module.results.kmod-artifact)"
+        - name: s3Endpoint
+          value: "$(params.s3Endpoint)"
+        - name: s3Bucket
+          value: "$(params.s3Bucket)"
+        - name: s3CredentialsSecret
+          value: "$(params.s3CredentialsSecret)"
+      workspaces:
+        - name: source
+          workspace: ws-publish
