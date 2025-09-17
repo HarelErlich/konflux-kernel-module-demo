@@ -53,6 +53,7 @@ spec:
         #!/usr/bin/env sh
         set -eux
         VERSION="$(date +%Y-%m-%d-%H%M%S)"
+        aws configure set default.s3.addressing_style path
         aws s3 cp \
           "$(workspaces.source.path)/kmod-dist/hello-world.ko" \
           "s3://$(params.s3Bucket)/${VERSION}/hello-world.ko" \

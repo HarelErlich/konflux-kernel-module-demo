@@ -21,9 +21,9 @@ spec:
       - name: s3Endpoint
         value: "https://axvbdgx0qi1m.compat.objectstorage.il-jerusalem-1.oraclecloud.com"
       - name: s3Bucket
-        value: "harel-erlich-test"
+        value: "bucket-20250917-1359ת"
       - name: s3CredentialsSecret
-        value: "gcs-publish-secret"
+        value: "oci-publish-secret"
     pipelineRef:
       resolver: git
       params:
