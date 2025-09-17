@@ -49,6 +49,10 @@ spec:
             secretKeyRef:
               name: $(params.s3CredentialsSecret)
               key: aws_secret_access_key
+        - name: AWS_REGION
+          value: "il-jerusalem-1"
+        - name: AWS_DEFAULT_REGION
+          value: "il-jerusalem-1"
       script: |
         #!/usr/bin/env sh
         set -eux
