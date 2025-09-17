@@ -1,0 +1,49 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: working-kernel-module-release-7db6b
+  namespace: rh-ee-herlich-tenant
+  labels:
+    appstudio.openshift.io/snapshot: kernel-module-app-7db6b
+    appstudio.openshift.io/application: kernel-module-app
+spec:
+  pipelineRef:
+    resolver: git
+    params:
+      - name: url
+        value: "https://github.com/HarelErlich/konflux-kernel-module-demo.git"
+      - name: revision
+        value: main
+      - name: pathInRepo
+        value: "pipelines/kernel-module-publish-pipeline.yaml"
+  params:
+    - name: input-image
+      value: "quay.io/herlich/kernel-module@sha256:5e1920fa710e50405f6df5d276e61dbe23f158f136b4f651a0d341b5bd4581e8"
+    - name: gitRepoURL
+      value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
+    - name: gitRepoTokenSecret
+      value: "git-publish-secret"
+    - name: s3Endpoint
+      value: "https://s3.eu-north-1.amazonaws.com"
+    - name: s3Bucket
+      value: "herlich-kmods-storage-20250907"
+    - name: s3CredentialsSecret
+      value: "s3-publish-secret"
+  serviceAccountName: appstudio-pipelines
+  workspaces:
+    - name: ws-repack
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    - name: ws-publish
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

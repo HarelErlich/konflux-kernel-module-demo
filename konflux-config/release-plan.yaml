@@ -1,4 +1,4 @@
-# konflux-config/release-plan.yaml (גרסה מתוקנת)
+# konflux-config/release-plan.yaml 
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: ReleasePlan
 metadata:
