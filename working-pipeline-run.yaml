@@ -1,10 +1,10 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: working-kernel-module-release-c5p7m
+  name: working-kernel-module-release-pdqv5
   namespace: rh-ee-herlich-tenant
   labels:
-    appstudio.openshift.io/snapshot: kernel-module-app-c5p7m   
+    appstudio.openshift.io/snapshot: kernel-module-app-pdqv5   
     appstudio.openshift.io/application: kernel-module-app
 spec:
   pipelineRef:
@@ -18,13 +18,13 @@ spec:
         value: "pipelines/kernel-module-publish-pipeline.yaml"
   params:
     - name: input-image
-      value: "quay.io/herlich/kernel-module@sha256:dcb2eb2e830f9daed7b18040d864b77ebf03a476a0ed78f83c056337b27740bb"
+      value: "quay.io/herlich/kernel-module@sha256:b37178f7be1af751a5385d7fff1e28c494f68729ca213ea736505c7b2e105aca"
     - name: gitRepoURL
       value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
     - name: gitRepoTokenSecret
       value: "git-publish-secret"
     - name: s3Endpoint
-      value: "https://storage.googleapis.com"
+      value: "https://axvbdgx0qi1m.compat.objectstorage.il-jerusalem-1.oraclecloud.com"
     - name: s3Bucket
       value: "harel-erlich-test"
     - name: s3CredentialsSecret
