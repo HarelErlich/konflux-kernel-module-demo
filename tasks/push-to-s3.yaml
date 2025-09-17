@@ -52,36 +52,8 @@ spec:
       script: |
         #!/usr/bin/env sh
         set -eux
-
-        echo "================================================="
-        echo "INFO: Starting S3 Upload Step"
-        echo "================================================="
-        
-        echo "--- 1. Printing environment variables ---"
-        env | sort
-        
-        
-        echo
-        echo "--- 3. Verifying AWS config file content ---"
-        # The HOME directory in Tekton containers is /tekton/home
-        cat /tekton/home/.aws/config || echo "AWS config file not found."
-        
-        echo
-        echo "--- 4. Preparing for upload ---"
         VERSION="$(date +%Y-%m-%d-%H%M%S)"
-        SOURCE_FILE="$(workspaces.source.path)/kmod-dist/hello-world.ko"
-        DEST_URI="s3://$(params.s3Bucket)/${VERSION}/hello-world.ko"
-        
-        echo "Source: ${SOURCE_FILE}"
-        echo "Destination: ${DEST_URI}"
-        echo "Endpoint: $(params.s3Endpoint)"
-        
-        echo
-        echo "--- 5. Attempting to upload file ---"
-        aws s3 cp "${SOURCE_FILE}" "${DEST_URI}" \
+        aws s3 cp \
+          "$(workspaces.source.path)/kmod-dist/hello-world.ko" \
+          "s3://$(params.s3Bucket)/${VERSION}/hello-world.ko" \
           --endpoint-url "$(params.s3Endpoint)" \
-          --region il-jerusalem-1
-        
-        echo "================================================="
-        echo "INFO: S3 Upload Step Finished"
-        echo "================================================="
