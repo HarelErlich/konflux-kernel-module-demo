@@ -19,11 +19,11 @@ spec:
       - name: gitRepoTokenSecret
         value: "git-publish-secret"
       - name: s3Endpoint
-        value: "https://s3.eu-central-1.wasabisys.com"
+        value: "https://s3.eu-de.cloud-object-storage.appdomain.cloud"
       - name: s3Bucket
-        value: "my-test-bucket-harel"
+        value: "herlich-kmods-test-20250917"
       - name: s3CredentialsSecret
-        value: "wasabi-publish-secret"
+        value: "ibmcos-publish-secret"
     pipelineRef:
       resolver: git
       params:

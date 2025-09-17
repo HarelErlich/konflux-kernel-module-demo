@@ -1,10 +1,10 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: working-kernel-module-release-xwqdg
+  name: working-kernel-module-release-c5p7m
   namespace: rh-ee-herlich-tenant
   labels:
-    appstudio.openshift.io/snapshot: kernel-module-app-xwqdg
+    appstudio.openshift.io/snapshot: kernel-module-app-c5p7m   
     appstudio.openshift.io/application: kernel-module-app
 spec:
   pipelineRef:
@@ -18,17 +18,17 @@ spec:
         value: "pipelines/kernel-module-publish-pipeline.yaml"
   params:
     - name: input-image
-      value: "quay.io/herlich/kernel-module@sha256:554ac342dc433db62da4058349d17cbe3c2210eb49f040fbd81c2b722ade8867"
+      value: "quay.io/herlich/kernel-module@sha256:dcb2eb2e830f9daed7b18040d864b77ebf03a476a0ed78f83c056337b27740bb"
     - name: gitRepoURL
       value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
     - name: gitRepoTokenSecret
       value: "git-publish-secret"
     - name: s3Endpoint
-      value: "https://s3.eu-central-1.wasabisys.com"
+      value: "https://s3.eu-de.cloud-object-storage.appdomain.cloud"
     - name: s3Bucket
-      value: "my-test-bucket-harel"
+      value: "herlich-kmods-test-20250917"
     - name: s3CredentialsSecret
-      value: "wasabi-publish-secret"
+      value: "ibmcos-publish-secret"
   serviceAccountName: appstudio-pipelines
   workspaces:
     - name: ws-repack
