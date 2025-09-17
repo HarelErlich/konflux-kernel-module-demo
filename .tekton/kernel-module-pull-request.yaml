@@ -24,14 +24,10 @@ spec:
     value: '{{revision}}'
   - name: output-image
     value: quay.io/herlich/kernel-module:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
   - name: dockerfile
     value: Dockerfile
   - name: path-context
     value: .
-  - name: skip-checks
-    value: "true"
   pipelineSpec:
     params:
     - name: git-url
@@ -40,15 +36,10 @@ spec:
       type: string
     - name: output-image
       type: string
-    - name: path-context
-      type: string
-      default: .
     - name: dockerfile
       type: string
-      default: Dockerfile
-    - name: skip-checks
+    - name: path-context
       type: string
-      default: "false"
     results:
     - name: IMAGE_URL
       value: $(tasks.build-container.results.IMAGE_URL)
@@ -66,14 +57,14 @@ spec:
       - name: revision
         value: $(params.revision)
       taskRef:
-        kind: Task
-        name: git-clone
         resolver: bundles
         params:
         - name: bundle
           value: quay.io/konflux-ci/tekton-catalog/task-git-clone:0.2
         - name: name
           value: git-clone
+        - name: kind
+          value: task
       workspaces:
       - name: output
         workspace: workspace
@@ -89,43 +80,18 @@ spec:
         value: $(params.dockerfile)
       - name: CONTEXT
         value: $(params.path-context)
-      - name: COMMIT_SHA
-        value: $(tasks.clone-repository.results.commit)
       taskRef:
-        kind: Task
-        name: buildah
         resolver: bundles
         params:
         - name: bundle
           value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.2
         - name: name
           value: buildah
+        - name: kind
+          value: task
       workspaces:
       - name: source
         workspace: workspace
-    - name: clair-scan
-      runAfter:
-        - build-container
-      when:
-        - input: "$(params.skip-checks)"
-          operator: in
-          values: ["false"]
-      params:
-        - name: image-digest
-          value: $(tasks.build-container.results.IMAGE_DIGEST)
-        - name: image-url
-          value: $(tasks.build-container.results.IMAGE_URL)
-      taskRef:
-        name: clair-scan
-        kind: Task
-        resolver: bundles
-        params:
-          - name: bundle
-            value: quay.io/konflux-ci/tekton-catalog/task-clair-scan:0.3
-          - name: name
-            value: clair-scan
-  taskRunTemplate:
-    serviceAccountName: build-pipeline-kernel-module
   workspaces:
   - name: workspace
     volumeClaimTemplate:
