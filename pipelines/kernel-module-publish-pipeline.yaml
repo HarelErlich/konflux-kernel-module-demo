@@ -23,14 +23,11 @@ spec:
     - name: s3Endpoint
       type: string
       description: "S3 endpoint, e.g. https://s3.us-east-1.amazonaws.com"
-      default: "https://s3.us-east-1.amazonaws.com"
     - name: s3Bucket
       type: string
       description: "Destination S3 bucket"
-      default: "kernel-modules-artifacts"
     - name: s3CredentialsSecret
       type: string
-      default: s3-publish-secret
       description: "K8s Secret name with aws_access_key_id / aws_secret_access_key"
 
   # Define two independent workspaces so each task gets an isolated emptyDir
