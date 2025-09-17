@@ -1,4 +1,42 @@
-- name: upload
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: push-to-s3
+spec:
+  description: |
+    Downloads the Trusted Artifact, then uploads hello-world.ko to S3.
+  params:
+    - name: kmod-artifact
+      type: string
+      description: TA name produced by 'create' (e.g. kmod.tar.gz)
+    - name: s3Endpoint
+      type: string
+    - name: s3Bucket
+      type: string
+    - name: s3CredentialsSecret
+      type: string
+      description: Secret with keys aws_access_key_id and aws_secret_access_key
+  workspaces:
+    - name: source
+      description: Workspace
+  steps:
+    - name: fetch-artifact
+      image: busybox:latest
+      script: |
+        #!/bin/sh
+        set -eux
+        DEST="$(workspaces.source.path)/kmod-dist"
+        mkdir -p "${DEST}"
+        # The artifact should be passed as a full path, but let's handle both cases
+        ARTIFACT_PATH="$(params.kmod-artifact)"
+        if [ ! -f "${ARTIFACT_PATH}" ]; then
+          # Try relative to workspace
+          ARTIFACT_PATH="$(workspaces.source.path)/$(params.kmod-artifact)"
+        fi
+        # Extract the tar.gz file
+        tar -xzf "${ARTIFACT_PATH}" -C "${DEST}"
+        ls -l "${DEST}"
+    - name: upload
       image: amazon/aws-cli:2.13.13
       env:
         - name: AWS_ACCESS_KEY_ID

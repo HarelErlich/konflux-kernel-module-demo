@@ -21,7 +21,7 @@ spec:
       - name: s3Endpoint
         value: "https://axvbdgx0qi1m.compat.objectstorage.il-jerusalem-1.oraclecloud.com"
       - name: s3Bucket
-        value: "bucket-20250917-1359ת"
+        value: "bucket-20250917-1359"
       - name: s3CredentialsSecret
         value: "oci-publish-secret"
     pipelineRef:
