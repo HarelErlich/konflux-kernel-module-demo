@@ -64,10 +64,6 @@ spec:
         echo "--- 1. Printing environment variables ---"
         env | sort
         
-        echo
-        echo "--- 2. Configuring AWS CLI ---"
-        aws configure set default.s3.addressing_style path
-        aws configure set default.s3.payload_signing true
         
         echo
         echo "--- 3. Verifying AWS config file content ---"

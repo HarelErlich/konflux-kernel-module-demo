@@ -1,10 +1,10 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: working-kernel-module-release-6fb5d 
+  name: working-kernel-module-release-lhd7h 
   namespace: rh-ee-herlich-tenant
   labels:
-    appstudio.openshift.io/snapshot: kernel-module-app-6fb5d 
+    appstudio.openshift.io/snapshot: kernel-module-app-lhd7h 
     appstudio.openshift.io/application: kernel-module-app
 spec:
   pipelineRef:
@@ -18,7 +18,7 @@ spec:
         value: "pipelines/kernel-module-publish-pipeline.yaml"
   params:
     - name: input-image
-      value: "quay.io/herlich/kernel-module@sha256:66849349eba9a7416c659a3b651cd9866f57facc39c967847d5684583de8cdb8"
+      value: "quay.io/herlich/kernel-module@sha256:9416834c2611e1188e0a05edae933a4e22faeef0c617a584505bf2295ec65c18"
     - name: gitRepoURL
       value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
     - name: gitRepoTokenSecret
