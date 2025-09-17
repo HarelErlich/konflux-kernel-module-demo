@@ -58,4 +58,5 @@ spec:
         aws s3 cp \
           "$(workspaces.source.path)/kmod-dist/hello-world.ko" \
           "s3://$(params.s3Bucket)/${VERSION}/hello-world.ko" \
-          --endpoint-url "$(params.s3Endpoint)"
+          --endpoint-url "$(params.s3Endpoint)" \
+          --region il-jerusalem-1
