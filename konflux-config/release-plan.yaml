@@ -19,11 +19,11 @@ spec:
       - name: gitRepoTokenSecret
         value: "git-publish-secret"
       - name: s3Endpoint
-        value: "https://s3.eu-de.cloud-object-storage.appdomain.cloud"
+        value: "https://storage.googleapis.com"
       - name: s3Bucket
-        value: "herlich-kmods-test-20250917"
+        value: "harel-erlich-test"
       - name: s3CredentialsSecret
-        value: "ibmcos-publish-secret"
+        value: "gcs-publish-secret"
     pipelineRef:
       resolver: git
       params:
