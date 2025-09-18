@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: working-kernel-module-release-xwqdg 
+  name: working-kernel-module-release-xwqdg
   namespace: rh-ee-herlich-tenant
   labels:
     appstudio.openshift.io/snapshot: kernel-module-app-xwqdg
@@ -29,6 +29,12 @@ spec:
       value: "bucket-20250917-1359"
     - name: s3CredentialsSecret
       value: "oci-publish-secret"
+    - name: azureStorageAccount
+      value: "herlichstor01"
+    - name: azureContainer
+      value: "kmods-artifacts"
+    - name: azureSpSecret
+      value: "azure-blob-sp-secret"
   serviceAccountName: appstudio-pipelines
   workspaces:
     - name: ws-repack

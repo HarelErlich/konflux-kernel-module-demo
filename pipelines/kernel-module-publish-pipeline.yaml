@@ -5,7 +5,7 @@ metadata:
   namespace: rh-ee-herlich-tenant
 spec:
   description: >
-    Repackage the built kernel module from a container image and publish it to Git and S3.
+    Repackage the built kernel module from a container image and publish it to Git, S3-compatible storage, and Azure Blob Storage.
     Tasks are resolved from Git via the Tekton "git" resolver.
 
   params:
@@ -29,8 +29,17 @@ spec:
     - name: s3CredentialsSecret
       type: string
       description: "K8s Secret name with aws_access_key_id / aws_secret_access_key"
+    - name: azureStorageAccount
+      type: string
+      description: "Azure Storage account name"
+    - name: azureContainer
+      type: string
+      description: "Azure Blob container name"
+    - name: azureSpSecret
+      type: string
+      description: "K8s Secret with AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET"
+      default: azure-blob-sp-secret
 
-  # Define two independent workspaces so each task gets an isolated emptyDir
   workspaces:
     - name: ws-repack
     - name: ws-publish
@@ -95,6 +104,30 @@ spec:
           value: "$(params.s3Bucket)"
         - name: s3CredentialsSecret
           value: "$(params.s3CredentialsSecret)"
+      workspaces:
+        - name: source
+          workspace: ws-repack
+
+    - name: push-to-azure
+      runAfter: [repack-kernel-module]
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: "https://github.com/HarelErlich/konflux-kernel-module-demo.git"
+          - name: revision
+            value: "main"
+          - name: pathInRepo
+            value: "tasks/push-to-azure.yaml"
+      params:
+        - name: kmod-artifact
+          value: "$(tasks.repack-kernel-module.results.kmod-artifact)"
+        - name: azureStorageAccount
+          value: "$(params.azureStorageAccount)"
+        - name: azureContainer
+          value: "$(params.azureContainer)"
+        - name: azureSpSecret
+          value: "$(params.azureSpSecret)"
       workspaces:
         - name: source
           workspace: ws-repack
