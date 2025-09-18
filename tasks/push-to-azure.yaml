@@ -1,0 +1,96 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: push-to-azure
+spec:
+  description: |
+    Extract the kmod tarball and upload hello-world.ko to Azure Blob Storage using Azure CLI (Service Principal RBAC).
+  params:
+    - name: kmod-artifact
+      type: string
+      description: TA name produced by 'repack' (e.g. kmod.tar.gz)
+    - name: azureStorageAccount
+      type: string
+      description: Azure Storage account name (e.g. herlichstor01)
+    - name: azureContainer
+      type: string
+      description: Azure Blob container name (e.g. kmods-artifacts)
+    - name: azureSpSecret
+      type: string
+      description: K8s Secret with AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET
+      default: azure-blob-sp-secret
+  results:
+    - name: azure-object-path
+      description: Uploaded blob path (prefix + filename)
+  workspaces:
+    - name: source
+      description: Workspace
+
+  steps:
+    - name: fetch-artifact
+      image: busybox:1.36
+      script: |
+        #!/bin/sh
+        set -eux
+        DEST="$(workspaces.source.path)/kmod-dist"
+        mkdir -p "${DEST}"
+        ARTIFACT_PATH="$(params.kmod-artifact)"
+        if [ ! -f "${ARTIFACT_PATH}" ]; then
+          ARTIFACT_PATH="$(workspaces.source.path)/$(params.kmod-artifact)"
+        fi
+        tar -xzf "${ARTIFACT_PATH}" -C "${DEST}"
+        ls -l "${DEST}"
+
+    - name: upload
+      image: mcr.microsoft.com/azure-cli:2.63.0
+      env:
+        - name: AZURE_TENANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: $(params.azureSpSecret)
+              key: AZURE_TENANT_ID
+        - name: AZURE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: $(params.azureSpSecret)
+              key: AZURE_CLIENT_ID
+        - name: AZURE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: $(params.azureSpSecret)
+              key: AZURE_CLIENT_SECRET
+      script: |
+        #!/usr/bin/env bash
+        set -eux
+        VERSION="$(date +%Y-%m-%d-%H%M%S)"
+        ACCOUNT="$(params.azureStorageAccount)"
+        CONTAINER="$(params.azureContainer)"
+        FILE="$(workspaces.source.path)/kmod-dist/hello-world.ko"
+
+        az login --service-principal \
+          -u "$AZURE_CLIENT_ID" \
+          -p "$AZURE_CLIENT_SECRET" \
+          --tenant "$AZURE_TENANT_ID" \
+          --allow-no-subscriptions
+
+        az storage container create \
+          --name "$CONTAINER" \
+          --account-name "$ACCOUNT" \
+          --auth-mode login >/dev/null
+
+
+        az storage blob upload \
+          --account-name "$ACCOUNT" \
+          --container-name "$CONTAINER" \
+          --name "${VERSION}/hello-world.ko" \
+          --file "$FILE" \
+          --auth-mode login \
+          --overwrite
+
+        az storage blob exists \
+          --account-name "$ACCOUNT" \
+          --container-name "$CONTAINER" \
+          --name "${VERSION}/hello-world.ko" \
+          --auth-mode login -o tsv | grep -q true
+
+        echo "${VERSION}/hello-world.ko" | tee "$(results.azure-object-path.path)"

@@ -1,10 +1,10 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: working-kernel-module-release-mxzxw 
+  name: working-kernel-module-release-xwqdg 
   namespace: rh-ee-herlich-tenant
   labels:
-    appstudio.openshift.io/snapshot: kernel-module-app-mxzxw
+    appstudio.openshift.io/snapshot: kernel-module-app-xwqdg
     appstudio.openshift.io/application: kernel-module-app
 spec:
   pipelineRef:
@@ -18,7 +18,7 @@ spec:
         value: "pipelines/kernel-module-publish-pipeline.yaml"
   params:
     - name: input-image
-      value: "quay.io/herlich/kernel-module@sha256:66940af55467f3f4d9890e9463581e1e40d73c3f3d3c6c57fa7848acafbd276d"
+      value: "quay.io/herlich/kernel-module@sha256:554ac342dc433db62da4058349d17cbe3c2210eb49f040fbd81c2b722ade8867"
     - name: gitRepoURL
       value: "github.com/HarelErlich/kernel-module-demo-artifacts.git"
     - name: gitRepoTokenSecret
