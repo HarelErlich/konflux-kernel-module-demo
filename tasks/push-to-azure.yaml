@@ -42,7 +42,7 @@ spec:
         ls -l "${DEST}"
 
     - name: upload
-      image: mcr.microsoft.com/azure-cli:2.63.0
+      image: mcr.microsoft.com/azure-cli:latest
       env:
         - name: AZURE_TENANT_ID
           valueFrom:
@@ -78,7 +78,6 @@ spec:
           --account-name "$ACCOUNT" \
           --auth-mode login >/dev/null
 
-
         az storage blob upload \
           --account-name "$ACCOUNT" \
           --container-name "$CONTAINER" \
@@ -87,10 +86,13 @@ spec:
           --auth-mode login \
           --overwrite
 
-        az storage blob exists \
+        if ! az storage blob exists \
           --account-name "$ACCOUNT" \
           --container-name "$CONTAINER" \
           --name "${VERSION}/hello-world.ko" \
-          --auth-mode login -o tsv | grep -q true
+          --auth-mode login -o tsv | grep -qi '^true$'; then
+          echo "Verification failed: blob not found" >&2
+          exit 1
+        fi
 
         echo "${VERSION}/hello-world.ko" | tee "$(results.azure-object-path.path)"
